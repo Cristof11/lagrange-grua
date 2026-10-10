@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interpolación de Lagrange — Grúa</title>
+<meta name="description" content="Taller de Análisis Numérico: estimación de la lectura del cable de una grúa por interpolación de Lagrange.">
+<style>
+  :root{
+    --bg:#f4f5f8; --card:#ffffff; --ink:#1b1f2a; --muted:#5d6475; --line:#e2e5ec;
+    --blue:#1f4e79; --blue-soft:#e8f0f8; --orange:#d9480f; --orange-soft:#fff1e8;
+    --green:#2b8a3e; --grid:#eceef3; --input:#fafbfc;
+    --b0:#3d7fb8; --b1:#2f9e44; --b2:#c2255c; --b3:#e67700; --b4:#7048e8; --b5:#0c8599;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12151c; --card:#1b1f29; --ink:#e7e9ef; --muted:#9aa1b2; --line:#2c3240;
+      --blue:#79aee0; --blue-soft:#1d2b3c; --orange:#ff8a4c; --orange-soft:#33231a;
+      --green:#5ccf74; --grid:#262b37; --input:#151922;
+      --b0:#74a9de; --b1:#5ccf74; --b2:#f06595; --b3:#ffa94d; --b4:#9775fa; --b5:#3bc9db;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 16px 48px}
+  header .kicker{color:var(--muted);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+  h1{margin:4px 0 8px;font-size:26px;color:var(--blue);line-height:1.2}
+  .enunciado{margin:0;color:var(--muted);max-width:760px}
+  .grid{display:grid;grid-template-columns:330px 1fr;gap:16px;margin-top:20px}
+  @media (max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .col{display:flex;flex-direction:column;gap:16px}
+  table.datos{width:100%;border-collapse:collapse}
+  table.datos th{font-size:12px;color:var(--muted);font-weight:600;text-align:center;padding:0 4px 6px}
+  table.datos td{padding:3px}
+  table.datos td.idx{color:var(--muted);font-size:12px;width:20px;text-align:center}
+  input[type=text],input[type=number]{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
+       background:var(--input);color:var(--ink);font:inherit;text-align:center}
+  input:focus{outline:2px solid var(--blue);outline-offset:-1px}
+  input.err{border-color:var(--orange);background:var(--orange-soft)}
+  .btns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  button{font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);
+         background:var(--card);color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--blue);color:var(--blue)}
+  button.prim{background:var(--blue);border-color:var(--blue);color:#fff}
+  button.prim:hover{filter:brightness(1.1);color:#fff}
+  .right{margin-left:auto}
+  #xEst{font-size:18px;font-weight:600}
+  input[type=range]{width:100%;margin:12px 0 2px;accent-color:var(--orange)}
+  .hint{font-size:12px;color:var(--muted)}
+  .res{background:var(--orange-soft);border-color:transparent}
+  .res .lbl{color:var(--muted);font-size:13px}
+  .res .big{font-size:34px;font-weight:700;color:var(--orange);line-height:1.1;margin:2px 0 10px;
+            font-variant-numeric:tabular-nums}
+  .res .pol{font-family:ui-monospace,Consolas,monospace;font-weight:600;color:var(--blue);font-size:15px}
+  .warn{color:var(--orange);font-size:12px;font-weight:600;min-height:1em}
+  .tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+  .tabs button.on{background:var(--blue-soft);border-color:var(--blue);color:var(--blue);font-weight:600}
+  .chart{position:relative;width:100%}
+  .chart svg{display:block;width:100%;height:auto;touch-action:none}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--card);font-size:12px;
+       padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-130%);display:none;
+       font-variant-numeric:tabular-nums}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px}
+  .legend i.dot{width:9px;height:9px;border-radius:50%}
+  /* desarrollo */
+  .pasos{margin-top:16px}
+  .paso{border-top:1px solid var(--line);padding:16px 0}
+  .paso:first-of-type{border-top:0;padding-top:4px}
+  .paso h3{margin:0 0 10px;font-size:16px;color:var(--blue)}
+  .paso h3 b{display:inline-block;min-width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;
+             background:var(--blue);color:#fff;font-size:13px;margin-right:8px}
+  .m{font-family:"Cambria Math","STIX Two Math","Latin Modern Math",Cambria,Georgia,serif;font-size:17px}
+  .eq{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:6px 0 6px 6px;overflow-x:auto}
+  .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 3px}
+  .frac>span{padding:0 4px;white-space:nowrap}
+  .frac>span:first-child{border-bottom:1.5px solid currentColor}
+  .box{display:inline-block;border:2px solid var(--orange);border-radius:8px;padding:4px 12px;color:var(--orange);font-weight:700}
+  .boxb{border-color:var(--blue);color:var(--blue)}
+  table.t{border-collapse:collapse;margin:4px 0;font-variant-numeric:tabular-nums}
+  table.t th,table.t td{border:1px solid var(--line);padding:6px 14px;text-align:center}
+  table.t th{background:var(--blue-soft);color:var(--blue);font-weight:600}
+  .ok{color:var(--green);font-weight:700}
+  .scroll{overflow-x:auto}
+  footer{margin-top:24px;color:var(--muted);font-size:13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  @media print{
+    body{background:#fff}
+    .noprint{display:none!important}
+    .grid{grid-template-columns:1fr}
+    .card{border:0;padding:0}
+    .paso{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Análisis Numérico · Taller en clase</div>
+    <h1>Ejercicio 1 · Interpolación de Lagrange</h1>
+    <p class="enunciado">Una grúa presenta los siguientes valores de “extensión adicional” del cable de carga.
+      Estime la lectura que debe corresponder en la escala para una carga de <b>4.85 ton</b>, halle el polinomio
+      de Lagrange y agregue la gráfica.</p>
+  </header>
+
+  <div class="grid">
+    <!-- Columna izquierda -->
+    <div class="col">
+      <section class="card">
+        <h2>Tabla de datos</h2>
+        <table class="datos">
+          <thead><tr><th></th><th>Carga (ton)</th><th>Lectura (mm)</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="btns noprint">
+          <button id="addRow" type="button">+ Punto</button>
+          <button id="delRow" type="button">− Punto</button>
+          <button id="reset" type="button" class="right">Restaurar</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Carga a estimar (ton)</h2>
+        <input id="xEst" type="text" inputmode="decimal" value="4.85" aria-label="Carga a estimar en toneladas">
+        <input id="slider" class="noprint" type="range" min="3" max="9" step="0.01" value="4.85" aria-label="Deslizar carga">
+        <div class="hint noprint">Desliza, escribe un valor o haz clic sobre la gráfica.</div>
+      </section>
+
+      <section class="card res">
+        <div class="lbl" id="resLbl">Lectura estimada para 4.85 ton</div>
+        <div class="big" id="resVal">—</div>
+        <div class="lbl">Polinomio de Lagrange</div>
+        <div class="pol" id="resPol">—</div>
+        <div class="warn" id="warn"></div>
+      </section>
+    </div>
+
+    <!-- Columna derecha: gráfica -->
+    <section class="card">
+      <div class="tabs noprint">
+        <button type="button" class="on" data-tab="p">Polinomio P(x)</button>
+        <button type="button" data-tab="b">Polinomios base Lᵢ(x)</button>
+      </div>
+      <div class="chart" id="chartBox">
+        <svg id="chart" viewBox="0 0 760 470" role="img" aria-label="Gráfica de la interpolación de Lagrange"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+  </div>
+
+  <section class="card pasos">
+    <h2>Desarrollo paso a paso</h2>
+    <div id="pasos"></div>
+  </section>
+
+  <footer>
+    <span>Jeison Crishtofer Rojas · Ingeniería de Sistemas · Universidad de Cundinamarca</span>
+    <button type="button" class="noprint right" onclick="window.print()">Imprimir / Guardar PDF</button>
+  </footer>
+</div>
+
+<script>
+/* =========================================================================
+   Datos del ejercicio
+   ========================================================================= */
+const DATOS = [[4, 76.5], [6, 78], [8, 79.3]];
+const X0 = 4.85;
+
+/* =========================================================================
+   Utilidades numéricas y de formato
+   ========================================================================= */
+function num(v, dec = 6) {
+  if (Math.abs(v) < 1e-12) v = 0;
+  let s = v.toFixed(dec).replace(/\.?0+$/, "");
+  if (s === "-0" || s === "") s = "0";
+  return s.replace("-", "−");
+}
+const polyMul = (a, b) => {
+  const r = new Array(a.length + b.length - 1).fill(0);
+  a.forEach((ai, i) => b.forEach((bj, j) => { r[i + j] += ai * bj; }));
+  return r;
+};
+const polyEval = (c, x) => c.reduce((s, a, k) => s + a * Math.pow(x, k), 0);
+
+/** Polinomio en HTML (o texto plano), de mayor a menor grado */
+function polyStr(c, html = true) {
+  const sup = k => html ? `<sup>${k}</sup>` : (k === 2 ? "²" : k === 3 ? "³" : "^" + k);
+  const parts = [];
+  for (let k = c.length - 1; k >= 0; k--) {
+    const a = c[k];
+    if (Math.abs(a) < 1e-12) continue;
+    const mag = Math.abs(a);
+    let t;
+    if (k === 0) t = num(mag);
+    else t = (Math.abs(mag - 1) < 1e-12 ? "" : num(mag)) + (html ? "<i>x</i>" : "x") + (k > 1 ? sup(k) : "");
+    parts.push([a < 0 ? "−" : "+", t]);
+  }
+  if (!parts.length) return "0";
+  let s = (parts[0][0] === "−" ? "−" : "") + parts[0][1];
+  for (const [sg, t] of parts.slice(1)) s += ` ${sg} ${t}`;
+  return s;
+}
+const fac = (xj) => xj < 0 ? `(<i>x</i> + ${num(-xj)})` : `(<i>x</i> − ${num(xj)})`;
+const par = (v) => v < 0 ? `(${num(v, 7)})` : num(v, 7);
+const frac = (n, d) => `<span class="frac"><span>${n}</span><span>${d}</span></span>`;
+
+/* =========================================================================
+   Interpolación de Lagrange
+   ========================================================================= */
+function lagrange(xs, ys, x) {
+  const n = xs.length, bases = [], dens = [], Lval = [], nums = [];
+  let poli = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    let p = [1], den = 1, prod = 1;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      p = polyMul(p, [-xs[j], 1]);
+      den *= (xs[i] - xs[j]);
+      prod *= (x - xs[j]);
+    }
+    const coef = p.map(c => c / den);
+    bases.push(coef); dens.push(den); nums.push(prod); Lval.push(prod / den);
+    coef.forEach((c, k) => { poli[k] += ys[i] * c; });
+  }
+  const valor = ys.reduce((s, y, i) => s + y * Lval[i], 0);
+  return { bases, dens, nums, Lval, poli, valor };
+}
+
+/* =========================================================================
+   Estado e interfaz
+   ========================================================================= */
+const $ = (id) => document.getElementById(id);
+let tab = "p";
+let ultimo = null;
+
+function fila(x = "", y = "") {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td class="idx"></td>
+    <td><input type="text" inputmode="decimal" value="${x}" aria-label="Carga"></td>
+    <td><input type="text" inputmode="decimal" value="${y}" aria-label="Lectura"></td>`;
+  tr.querySelectorAll("input").forEach(inp => inp.addEventListener("input", calcular));
+  $("tbody").appendChild(tr);
+  renumerar();
+}
+function renumerar() {
+  [...$("tbody").rows].forEach((r, i) => r.cells[0].textContent = i);
+}
+function restaurar() {
+  $("tbody").innerHTML = "";
+  DATOS.forEach(([x, y]) => fila(x, y));
+  $("xEst").value = X0;
+  calcular();
+}
+const leerNum = (s) => {
+  s = String(s).trim().replace(",", ".");
+  if (s === "" || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s)) return NaN;
+  return parseFloat(s);
+};
+
+function leer() {
+  const xs = [], ys = [];
+  let ok = true;
+  document.querySelectorAll("#tbody input").forEach(i => i.classList.remove("err"));
+  $("xEst").classList.remove("err");
+  [...$("tbody").rows].forEach(r => {
+    const [ix, iy] = r.querySelectorAll("input");
+    const x = leerNum(ix.value), y = leerNum(iy.value);
+    if (isNaN(x)) { ix.classList.add("err"); ok = false; }
+    if (isNaN(y)) { iy.classList.add("err"); ok = false; }
+    xs.push(x); ys.push(y);
+  });
+  // x repetidos
+  xs.forEach((x, i) => {
+    if (!isNaN(x) && xs.indexOf(x) !== i) {
+      $("tbody").rows[i].querySelector("input").classList.add("err"); ok = false;
+    }
+  });
+  const x = leerNum($("xEst").value);
+  if (isNaN(x)) { $("xEst").classList.add("err"); ok = false; }
+  if (xs.length < 2) ok = false;
+  return ok ? { xs, ys, x } : null;
+}
+
+function calcular(desdeSlider) {
+  const d = leer();
+  if (!d) {
+    $("warn").textContent = "Revisa los valores marcados (números válidos, sin cargas repetidas, mínimo 2 puntos).";
+    return;
+  }
+  const { xs, ys, x } = d;
+  const r = lagrange(xs, ys, x);
+  ultimo = { xs, ys, x, r };
+
+  const lo = Math.min(...xs), hi = Math.max(...xs), m = (hi - lo) * 0.25 || 1;
+  const s = $("slider");
+  s.min = (lo - m).toFixed(2); s.max = (hi + m).toFixed(2);
+  if (desdeSlider !== true) s.value = x;
+
+  $("resLbl").textContent = `Lectura estimada para ${num(x).replace("−", "-")} ton`;
+  $("resVal").textContent = `${r.valor.toFixed(4)} mm`;
+  $("resPol").innerHTML = "P(<i>x</i>) = " + polyStr(r.poli);
+  $("warn").textContent = (x < lo || x > hi)
+    ? `⚠ ${num(x)} ton está fuera del intervalo [${num(lo)}, ${num(hi)}]: es una extrapolación.` : "";
+
+  dibujar();
+  desarrollo(xs, ys, x, r);
+}
+
+/* =========================================================================
+   Gráfica (SVG, sin librerías)
+   ========================================================================= */
+const W = 760, H = 470, M = { l: 62, r: 22, t: 34, b: 52 };
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function ticks(a, b, n = 6) {
+  const span = b - a, step0 = span / n, p = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(k => k * p).find(s => s >= step0);
+  const out = [];
+  for (let v = Math.ceil(a / step) * step; v <= b + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+
+let escala = null;
+function dibujar() {
+  if (!ultimo) return;
+  const { xs, ys, x, r } = ultimo;
+  const svg = $("chart");
+  const lo = Math.min(...xs, x), hi = Math.max(...xs, x), pad = (hi - lo) * 0.15 || 1;
+  const x0 = lo - pad, x1 = hi + pad, N = 300;
+  const muestras = (f) => Array.from({ length: N + 1 }, (_, k) => { const t = x0 + (x1 - x0) * k / N; return [t, f(t)]; });
+
+  let series = [], y0, y1;
+  const colB = ["--b0", "--b1", "--b2", "--b3", "--b4", "--b5"].map(css);
+  if (tab === "p") {
+    const pts = muestras(t => polyEval(r.poli, t));
+    series.push({ pts, color: css("--blue"), w: 2.6, label: "P(x) = " + polyStr(r.poli, false) });
+    const all = pts.map(p => p[1]).concat(ys, [r.valor]);
+    y0 = Math.min(...all); y1 = Math.max(...all);
+  } else {
+    r.bases.forEach((c, i) => series.push({ pts: muestras(t => polyEval(c, t)), color: colB[i % colB.length], w: 2, label: `L${i}(x)` }));
+    y0 = -0.6; y1 = 1.4;
+    series.forEach(s => s.pts.forEach(p => { if (p[1] < y0 && p[1] > -3) y0 = p[1]; if (p[1] > y1 && p[1] < 4) y1 = p[1]; }));
+  }
+  const yp = (y1 - y0) * 0.12 || 1; y0 -= yp; y1 += yp;
+
+  const sx = v => M.l + (v - x0) / (x1 - x0) * (W - M.l - M.r);
+  const sy = v => H - M.b - (v - y0) / (y1 - y0) * (H - M.t - M.b);
+  escala = { x0, x1, sx, sy, inv: px => x0 + (px - M.l) / (W - M.l - M.r) * (x1 - x0) };
+
+  const ink = css("--ink"), muted = css("--muted"), grid = css("--grid"), orange = css("--orange"), green = css("--green"), card = css("--card");
+  let g = "";
+  // fondo de la zona de datos
+  g += `<rect x="${sx(Math.min(...xs))}" y="${M.t}" width="${sx(Math.max(...xs)) - sx(Math.min(...xs))}" height="${H - M.t - M.b}" fill="${css("--blue-soft")}" opacity=".45"/>`;
+  // rejilla y ejes
+  ticks(x0, x1).forEach(t => {
+    g += `<line x1="${sx(t)}" x2="${sx(t)}" y1="${M.t}" y2="${H - M.b}" stroke="${grid}"/>`;
+    g += `<text x="${sx(t)}" y="${H - M.b + 18}" fill="${muted}" font-size="12" text-anchor="middle">${num(t, 3)}</text>`;
+  });
+  ticks(y0, y1).forEach(t => {
+    g += `<line x1="${M.l}" x2="${W - M.r}" y1="${sy(t)}" y2="${sy(t)}" stroke="${grid}"/>`;
+    g += `<text x="${M.l - 8}" y="${sy(t) + 4}" fill="${muted}" font-size="12" text-anchor="end">${num(t, 3)}</text>`;
+  });
+  if (tab === "b") {
+    [0, 1].forEach(v => { if (v > y0 && v < y1) g += `<line x1="${M.l}" x2="${W - M.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="${muted}" stroke-dasharray="2 3" opacity=".7"/>`; });
+  }
+  g += `<rect x="${M.l}" y="${M.t}" width="${W - M.l - M.r}" height="${H - M.t - M.b}" fill="none" stroke="${muted}" opacity=".5"/>`;
+  g += `<text x="${(M.l + W - M.r) / 2}" y="${H - 12}" fill="${ink}" font-size="13" text-anchor="middle">Carga (ton)</text>`;
+  g += `<text transform="translate(16 ${(M.t + H - M.b) / 2}) rotate(-90)" fill="${ink}" font-size="13" text-anchor="middle">${tab === "p" ? "Lectura (mm)" : "Lᵢ(x)"}</text>`;
+  g += `<text x="${M.l}" y="20" fill="${ink}" font-size="14" font-weight="700">${tab === "p" ? "Interpolación de Lagrange — extensión del cable" : "Polinomios base de Lagrange"}</text>`;
+
+  // curvas (recortadas al área)
+  g += `<clipPath id="clip"><rect x="${M.l}" y="${M.t}" width="${W - M.l - M.r}" height="${H - M.t - M.b}"/></clipPath><g clip-path="url(#clip)">`;
+  series.forEach(s => {
+    const d = s.pts.map((p, k) => (k ? "L" : "M") + sx(p[0]).toFixed(2) + " " + sy(p[1]).toFixed(2)).join("");
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.w}" stroke-linejoin="round"/>`;
+  });
+  g += `</g>`;
+
+  if (tab === "p") {
+    // guías y punto estimado
+    const ex = sx(x), ey = sy(r.valor);
+    g += `<line x1="${ex}" x2="${ex}" y1="${H - M.b}" y2="${ey}" stroke="${orange}" stroke-dasharray="4 4" stroke-width="1.5"/>`;
+    g += `<line x1="${M.l}" x2="${ex}" y1="${ey}" y2="${ey}" stroke="${orange}" stroke-dasharray="4 4" stroke-width="1.5"/>`;
+    // datos
+    xs.forEach((xi, i) => {
+      g += `<circle cx="${sx(xi)}" cy="${sy(ys[i])}" r="6" fill="${green}" stroke="${card}" stroke-width="2"/>`;
+      g += `<text x="${sx(xi) + 9}" y="${sy(ys[i]) + 18}" fill="${green}" font-size="12">(${num(xi)}, ${num(ys[i])})</text>`;
+    });
+    g += star(ex, ey, 10, orange, card);
+    // etiqueta debajo-derecha del punto (la curva es creciente); se ajusta en los bordes
+    const enDerecha = ex < W - M.r - 190;
+    g += `<text x="${enDerecha ? ex + 14 : ex - 14}" y="${Math.min(ey + 26, H - M.b - 8)}" fill="${orange}" font-size="13" font-weight="700" text-anchor="${enDerecha ? "start" : "end"}">P(${num(x)}) ≈ ${r.valor.toFixed(4)} mm</text>`;
+  } else {
+    // marca de x en las bases
+    const ex = sx(x);
+    g += `<line x1="${ex}" x2="${ex}" y1="${M.t}" y2="${H - M.b}" stroke="${orange}" stroke-dasharray="4 4" stroke-width="1.5"/>`;
+    r.bases.forEach((c, i) => {
+      g += `<circle cx="${ex}" cy="${sy(r.Lval[i])}" r="5" fill="${colB[i % colB.length]}" stroke="${card}" stroke-width="2"/>`;
+      g += `<text x="${ex + 9}" y="${sy(r.Lval[i]) - 6}" fill="${colB[i % colB.length]}" font-size="12" font-weight="600">L${i}(${num(x)}) = ${num(r.Lval[i], 4)}</text>`;
+    });
+    xs.forEach(xi => { g += `<circle cx="${sx(xi)}" cy="${sy(0)}" r="3" fill="${muted}"/><circle cx="${sx(xi)}" cy="${sy(1)}" r="3" fill="${muted}"/>`; });
+  }
+  // capa interactiva
+  g += `<line id="hx" y1="${M.t}" y2="${H - M.b}" stroke="${muted}" stroke-width="1" visibility="hidden"/>`;
+  g += `<circle id="hp" r="5" fill="${css("--blue")}" stroke="${card}" stroke-width="2" visibility="hidden"/>`;
+  g += `<rect id="hit" x="${M.l}" y="${M.t}" width="${W - M.l - M.r}" height="${H - M.t - M.b}" fill="transparent" style="cursor:crosshair"/>`;
+  svg.innerHTML = g;
+
+  // leyenda
+  const leg = $("legend");
+  if (tab === "p") {
+    leg.innerHTML = `<span><i style="background:${css("--blue")}"></i>P(x) = ${polyStr(r.poli)}</span>
+      <span><i class="dot" style="background:${green}"></i>Datos de la tabla</span>
+      <span><i class="dot" style="background:${orange}"></i>Estimación</span>
+      <span><i style="background:${css("--blue-soft")};height:9px"></i>Intervalo de los datos</span>`;
+  } else {
+    leg.innerHTML = r.bases.map((c, i) => `<span><i style="background:${colB[i % colB.length]}"></i>L${i}(x) = ${polyStr(c)}</span>`).join("")
+      + `<span>Cada Lᵢ vale 1 en xᵢ y 0 en los demás nodos.</span>`;
+  }
+  enlazarHover();
+}
+
+function star(cx, cy, R, fill, stroke) {
+  let p = [];
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? R * 0.45 : R;
+    p.push((cx + rr * Math.cos(a)).toFixed(2) + "," + (cy + rr * Math.sin(a)).toFixed(2));
+  }
+  return `<polygon points="${p.join(" ")}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+}
+
+function enlazarHover() {
+  const svg = $("chart"), hit = $("hit"), tip = $("tip"), box = $("chartBox");
+  const toSvg = (ev) => {
+    const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  };
+  const mover = (ev) => {
+    if (!escala || !ultimo) return;
+    const p = toSvg(ev), xv = escala.inv(p.x);
+    const hx = $("hx"), hp = $("hp");
+    hx.setAttribute("x1", p.x); hx.setAttribute("x2", p.x); hx.setAttribute("visibility", "visible");
+    let txt;
+    if (tab === "p") {
+      const yv = polyEval(ultimo.r.poli, xv);
+      hp.setAttribute("cx", p.x); hp.setAttribute("cy", escala.sy(yv)); hp.setAttribute("visibility", "visible");
+      txt = `x = ${xv.toFixed(3)} ton → P(x) = ${yv.toFixed(4)} mm`;
+    } else {
+      hp.setAttribute("visibility", "hidden");
+      txt = `x = ${xv.toFixed(3)}: ` + ultimo.r.bases.map((c, i) => `L${i} = ${polyEval(c, xv).toFixed(3)}`).join(", ");
+    }
+    const rect = svg.getBoundingClientRect(), k = rect.width / W;
+    tip.textContent = txt; tip.style.display = "block";
+    tip.style.left = Math.min(Math.max(p.x * k, 110), rect.width - 110) + "px";
+    tip.style.top = (tab === "p" ? escala.sy(polyEval(ultimo.r.poli, xv)) : M.t + 20) * k + "px";
+  };
+  hit.addEventListener("pointermove", mover);
+  hit.addEventListener("pointerleave", () => {
+    tip.style.display = "none";
+    $("hx")?.setAttribute("visibility", "hidden"); $("hp")?.setAttribute("visibility", "hidden");
+  });
+  hit.addEventListener("click", (ev) => {
+    const xv = escala.inv(toSvg(ev).x);
+    $("xEst").value = +xv.toFixed(2);
+    calcular();
+  });
+}
+
+/* =========================================================================
+   Desarrollo paso a paso
+   ========================================================================= */
+function desarrollo(xs, ys, x, r) {
+  const n = xs.length, X = num(x);
+  const paso = (k, t, body) => `<div class="paso"><h3><b>${k}</b>${t}</h3>${body}</div>`;
+  let h = "";
+
+  // 1
+  h += paso(1, "Datos del problema", `
+    <div class="scroll"><table class="t"><tr><th>i</th><th>Carga x<sub>i</sub> (ton)</th><th>Lectura y<sub>i</sub> (mm)</th></tr>
+    ${xs.map((xi, i) => `<tr><td>${i}</td><td>${num(xi)}</td><td>${num(ys[i])}</td></tr>`).join("")}</table></div>
+    <p>Se busca la lectura para <b>x = ${X} ton</b>. Con ${n} puntos se obtiene un polinomio de grado ${n - 1}.</p>`);
+
+  // 2
+  h += paso(2, "Fórmula de interpolación de Lagrange", `
+    <div class="eq m">P(<i>x</i>) = <span style="font-size:24px">Σ</span> <i>y<sub>i</sub></i> · <i>L<sub>i</sub></i>(<i>x</i>),
+    &nbsp;&nbsp; <i>L<sub>i</sub></i>(<i>x</i>) = <span style="font-size:24px">Π</span><sub style="font-size:12px">j≠i</sub>
+    ${frac("<i>x</i> − <i>x<sub>j</sub></i>", "<i>x<sub>i</sub></i> − <i>x<sub>j</sub></i>")}</div>
+    <p class="hint">Cada polinomio base vale 1 en su propio nodo x<sub>i</sub> y 0 en los demás.</p>`);
+
+  // 3
+  let b3 = "";
+  for (let i = 0; i < n; i++) {
+    const nu = xs.map((xj, j) => j === i ? "" : fac(xj)).join("");
+    const de = xs.map((xj, j) => j === i ? "" : `(${num(xs[i])} − ${num(xj)})`).join("");
+    b3 += `<div class="eq m"><i>L</i><sub>${i}</sub>(<i>x</i>) = ${frac(nu, de)} = ${frac(nu, num(r.dens[i]))} = ${polyStr(r.bases[i])}</div>`;
+  }
+  h += paso(3, "Polinomios base L<sub>i</sub>(x)", b3);
+
+  // 4
+  let b4 = "";
+  for (let i = 0; i < n; i++) {
+    const nu = xs.map((xj, j) => j === i ? "" : `(${X} − ${num(xj)})`).join("");
+    b4 += `<div class="eq m"><i>L</i><sub>${i}</sub>(${X}) = ${frac(nu, num(r.dens[i]))} = ${frac(num(r.nums[i], 7), num(r.dens[i]))} = <b>${num(r.Lval[i], 7)}</b></div>`;
+  }
+  const sL = r.Lval.reduce((a, b) => a + b, 0);
+  b4 += `<p>Comprobación: ${r.Lval.map((v, i) => `L<sub>${i}</sub>`).join(" + ")} = ${num(sL, 7)} <span class="ok">✓</span> (la suma de las bases siempre es 1)</p>`;
+  h += paso(4, `Evaluar cada L<sub>i</sub> en x = ${X}`, b4);
+
+  // 5
+  const prods = ys.map((y, i) => y * r.Lval[i]);
+  h += paso(5, `Calcular P(${X})`, `
+    <div class="eq m">P(${X}) = ${ys.map((y, i) => `(${num(y)})(${num(r.Lval[i], 7)})`).join(" + ")}</div>
+    <div class="eq m">P(${X}) = ${prods.map(p => par(p)).join(" + ")}</div>
+    <div class="eq m">P(${X}) = <span class="box">${num(r.valor, 7)} mm</span></div>`);
+
+  // 6
+  let b6 = "";
+  for (let i = 0; i < n; i++) {
+    b6 += `<div class="eq m"><i>y</i><sub>${i}</sub><i>L</i><sub>${i}</sub>(<i>x</i>) = ${num(ys[i])}·[${polyStr(r.bases[i])}] = ${polyStr(r.bases[i].map(c => c * ys[i]))}</div>`;
+  }
+  b6 += `<p>Sumando términos semejantes:</p><div class="eq m"><span class="box boxb">P(<i>x</i>) = ${polyStr(r.poli)}</span></div>`;
+  h += paso(6, "Polinomio interpolante P(x)", b6);
+
+  // 7
+  h += paso(7, "Verificación en los nodos", `
+    <div class="scroll"><table class="t"><tr><th>x<sub>i</sub></th><th>P(x<sub>i</sub>)</th><th>y<sub>i</sub> (tabla)</th><th></th></tr>
+    ${xs.map((xi, i) => { const v = polyEval(r.poli, xi); return `<tr><td>${num(xi)}</td><td>${num(v, 6)}</td><td>${num(ys[i])}</td><td class="ok">${Math.abs(v - ys[i]) < 1e-8 ? "✓" : "✗"}</td></tr>`; }).join("")}
+    </table></div>
+    <p>Evaluando el polinomio directamente: P(${X}) = ${num(polyEval(r.poli, x), 7)} mm, igual al paso 5.</p>`);
+
+  // Respuesta
+  h += paso("✓", "Respuesta", `<p style="font-size:17px">Para una carga de <b>${X} ton</b>, la lectura que debe corresponder en la escala es
+    <span class="box">≈ ${r.valor.toFixed(4)} mm</span> &nbsp;(≈ ${r.valor.toFixed(2)} mm).</p>`);
+
+  $("pasos").innerHTML = h;
+}
+
+/* =========================================================================
+   Eventos
+   ========================================================================= */
+$("addRow").onclick = () => fila();
+$("delRow").onclick = () => {
+  if ($("tbody").rows.length <= 2) { $("warn").textContent = "Se necesitan al menos 2 puntos."; return; }
+  $("tbody").deleteRow(-1); calcular();
+};
+$("reset").onclick = restaurar;
+$("xEst").addEventListener("input", calcular);
+$("slider").addEventListener("input", (e) => { $("xEst").value = (+e.target.value).toFixed(2); calcular(true); });
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(o => o.classList.toggle("on", o === b));
+  tab = b.dataset.tab; dibujar();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", dibujar);
+
+restaurar();
+</script>
+</body>
+</html>
